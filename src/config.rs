@@ -1,0 +1,1 @@
+pub const GEMINI_API_KEY: &str = "AIzaSyDMWZXSVKPIvqRuDwktWYQZ5OqFCZh6J-8";
