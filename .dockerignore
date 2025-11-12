@@ -33,8 +33,11 @@ Thumbs.db
 *.md
 !README.md
 
-# AI service
-ai_music_service/
+# AI service build artifacts
+ai_music_service/venv/
+ai_music_service/generated_music/
+ai_music_service/__pycache__/
+ai_music_service/*.pyc
 
 # Other
 SETUP.md
