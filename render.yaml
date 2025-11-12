@@ -1,0 +1,40 @@
+services:
+  # Rust Backend + React Frontend
+  - type: web
+    name: melanify-backend
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 8081
+      - key: FRONTEND_URL
+        sync: false
+      - key: SPOTIFY_CLIENT_ID
+        sync: false
+      - key: SPOTIFY_CLIENT_SECRET
+        sync: false
+      - key: SPOTIFY_REDIRECT_URI
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: RUST_LOG
+        value: info
+
+  # Python AI Music Generation Service
+  - type: web
+    name: melanify-ai-service
+    env: docker
+    dockerfilePath: ./ai_music_service/Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: CORS_ORIGINS
+        sync: false
+      - key: PYTHONUNBUFFERED
+        value: 1
