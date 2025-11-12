@@ -30,12 +30,6 @@ interface AiSong {
     prompt: string;
 }
 
-interface AiMusicResponse {
-    success: boolean;
-    songs: AiSong[];
-    count: number;
-}
-
 const HomePage: React.FC = () => {
     const [prompt, setPrompt] = useState('');
     const [loading, setLoading] = useState(false);
@@ -47,7 +41,6 @@ const HomePage: React.FC = () => {
     const [imageCaption, setImageCaption] = useState<string | null>(null);
     const [duration, setDuration] = useState<number>(10);
     const [withVocals, setWithVocals] = useState<boolean>(false);
-    const navigate = useNavigate();
     const location = useLocation();
 
     useEffect(() => {
