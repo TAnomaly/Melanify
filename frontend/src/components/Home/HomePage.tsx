@@ -43,6 +43,10 @@ const HomePage: React.FC = () => {
     const [generatedPlaylist, setGeneratedPlaylist] = useState<PlaylistData | null>(null);
     const [generationMode, setGenerationMode] = useState<GenerationMode>('spotify');
     const [aiSongs, setAiSongs] = useState<AiSong[] | null>(null);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [imageCaption, setImageCaption] = useState<string | null>(null);
+    const [duration, setDuration] = useState<number>(10);
+    const [withVocals, setWithVocals] = useState<boolean>(false);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -74,6 +78,57 @@ const HomePage: React.FC = () => {
         } catch (err) {
             console.error('Error handling Spotify callback:', err);
             setError('Spotify callback işlemi başarısız oldu.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Preview image
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setSelectedImage(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+
+        // Analyze image
+        setLoading(true);
+        setError(null);
+        setImageCaption(null);
+
+        try {
+            const base64Image = await new Promise<string>((resolve) => {
+                const r = new FileReader();
+                r.onloadend = () => resolve(r.result as string);
+                r.readAsDataURL(file);
+            });
+
+            const response = await api.post('http://localhost:5000/analyze-image', {
+                image: base64Image
+            });
+
+            console.log('Image analysis response:', response.data);
+
+            if (response.data.success) {
+                const caption = response.data.caption;
+                const suggestedPrompt = response.data.suggested_prompt;
+
+                console.log('Caption:', caption);
+                console.log('Suggested prompt:', suggestedPrompt);
+
+                setImageCaption(caption);
+                setPrompt(suggestedPrompt);
+
+                console.log('State updated - caption and prompt set');
+            } else {
+                setError('Görüntü analizi başarısız oldu.');
+            }
+        } catch (err) {
+            console.error('Error analyzing image:', err);
+            setError('Görüntü analiz edilirken bir hata oluştu.');
         } finally {
             setLoading(false);
         }
@@ -112,13 +167,10 @@ const HomePage: React.FC = () => {
                 // Generate AI music
                 const response = await api.post('/generate-ai-music-batch', {
                     prompts: [
-                        { title: 'Track 1', prompt: prompt },
-                        { title: 'Track 2', prompt: prompt },
-                        { title: 'Track 3', prompt: prompt },
-                        { title: 'Track 4', prompt: prompt },
-                        { title: 'Track 5', prompt: prompt },
+                        { title: 'Generated Track', prompt: prompt },
                     ],
-                    duration: 10
+                    duration: duration,
+                    with_vocals: withVocals
                 });
 
                 if (response.data.success) {
@@ -224,6 +276,62 @@ const HomePage: React.FC = () => {
                         </div>
                     </button>
                 </div>
+
+                {/* Image Upload Section - Only for AI Music mode */}
+                {generationMode === 'ai-music' && (
+                    <div className="image-upload-section">
+                        <h3>📸 Fotoğraftan Müzik Üret</h3>
+                        <p>Fotoğraf yükleyin, AI duygu durumunu analiz edip ona göre müzik üretsin!</p>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            style={{marginBottom: '20px'}}
+                        />
+                        {selectedImage && (
+                            <div className="image-preview">
+                                <img src={selectedImage} alt="Selected" style={{maxWidth: '300px', marginBottom: '10px'}} />
+                                {imageCaption && (
+                                    <div className="caption-box">
+                                        <strong>🔍 Görüntü Analizi:</strong> {imageCaption}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <div className="separator">— VEYA —</div>
+                    </div>
+                )}
+
+                {/* AI Music Options - Only for AI Music mode */}
+                {generationMode === 'ai-music' && (
+                    <div className="ai-options">
+                        <div className="option-group">
+                            <label htmlFor="duration">⏱️ Müzik Süresi:</label>
+                            <select
+                                id="duration"
+                                value={duration}
+                                onChange={(e) => setDuration(Number(e.target.value))}
+                                className="duration-select"
+                            >
+                                <option value={5}>5 saniye</option>
+                                <option value={10}>10 saniye</option>
+                                <option value={15}>15 saniye</option>
+                                <option value={20}>20 saniye</option>
+                                <option value={30}>30 saniye</option>
+                            </select>
+                        </div>
+                        <div className="option-group">
+                            <label className="checkbox-label">
+                                <input
+                                    type="checkbox"
+                                    checked={withVocals}
+                                    onChange={(e) => setWithVocals(e.target.checked)}
+                                />
+                                <span>🎤 Sözlü Müzik (Vokal içersin)</span>
+                            </label>
+                        </div>
+                    </div>
+                )}
 
                 <div className="prompt-container">
                     <textarea

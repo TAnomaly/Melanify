@@ -113,3 +113,50 @@ pub struct RecentlyPlayedResponse {
 pub struct CallbackForm {
     pub tracks: String,
 }
+
+// AI Music Generation Models
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AiMusicRequest {
+    pub prompt: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AiMusicBatchRequest {
+    pub prompts: Vec<AiMusicPrompt>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AiMusicPrompt {
+    pub title: String,
+    pub prompt: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AiMusicResponse {
+    pub success: bool,
+    pub file_id: String,
+    pub file_path: String,
+    pub duration: u32,
+    pub sample_rate: u32,
+    pub prompt: String,
+    pub timestamp: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AiMusicBatchResponse {
+    pub success: bool,
+    pub songs: Vec<AiSong>,
+    pub count: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AiSong {
+    pub title: String,
+    pub file_id: String,
+    pub file_path: String,
+    pub prompt: String,
+}

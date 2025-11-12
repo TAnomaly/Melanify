@@ -4,15 +4,15 @@ pub mod services;
 
 use actix_web::web;
 use services::gemini_service::GeminiService;
+use services::musicgen_service::MusicGenService;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-
-pub const GEMINI_API_KEY: &str = "AIzaSyDMWZXSVKPIvqRuDwktWYQZ5OqFCZh6J-8";
 
 #[derive(Clone)]
 pub struct AppState {
     pub pending_tracks: Arc<Mutex<HashMap<String, models::playlist::CreatePlaylistRequest>>>,
     pub gemini_service: GeminiService,
+    pub musicgen_service: MusicGenService,
     pub auth_states: Arc<Mutex<HashMap<String, String>>>,
 }
 
@@ -32,6 +32,19 @@ pub fn configure_app(config: &mut web::ServiceConfig) {
             .route(
                 "/create-spotify-playlist",
                 web::post().to(handlers::create_spotify_playlist_handler),
+            )
+            // AI Music Generation routes
+            .route(
+                "/generate-ai-music",
+                web::post().to(handlers::generate_ai_music),
+            )
+            .route(
+                "/generate-ai-music-batch",
+                web::post().to(handlers::generate_ai_music_batch),
+            )
+            .route(
+                "/ai-music-health",
+                web::get().to(handlers::ai_music_health_check),
             ),
     );
 }

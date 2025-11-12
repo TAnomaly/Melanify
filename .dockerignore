@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Rust
+target/
+**/*.rs.bk
+*.pdb
+*.rlib
+
+# Node
+frontend/node_modules/
+frontend/build/
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!README.md
+
+# AI service
+ai_music_service/
+
+# Other
+SETUP.md

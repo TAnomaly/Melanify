@@ -7,34 +7,40 @@ use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
 use dotenv::dotenv;
 use spotify_ai_playlist::services::gemini_service::GeminiService;
-use spotify_ai_playlist::{configure_app, AppState, GEMINI_API_KEY};
+use spotify_ai_playlist::services::musicgen_service::MusicGenService;
+use spotify_ai_playlist::{configure_app, AppState};
 use std::collections::HashMap;
+use std::env;
 use std::sync::{Arc, Mutex};
-
-// Update Spotify credentials
-const SPOTIFY_CLIENT_ID: &str = "ae95afc24c12492a952e3d586ab8dcca";
-const SPOTIFY_CLIENT_SECRET: &str = "0c4fc4b5032b4b4fac846d69073d3d54";
-const SPOTIFY_REDIRECT_URI: &str = "http://127.0.0.1:8081/callback";
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
     env_logger::init();
 
-    println!("Server starting at http://127.0.0.1:8081");
+    // Get environment variables
+    let host = env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let port = env::var("PORT").unwrap_or_else(|_| "8081".to_string());
+    let gemini_api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY must be set");
+    let frontend_url = env::var("FRONTEND_URL").unwrap_or_else(|_| format!("http://{}:{}", host, port));
+
+    println!("Server starting at http://{}:{}", host, port);
 
     // Generate a random secret key for session encryption
     let secret_key = Key::generate();
 
     let app_state = AppState {
         pending_tracks: Arc::new(Mutex::new(HashMap::new())),
-        gemini_service: GeminiService::new(GEMINI_API_KEY.to_string()),
+        gemini_service: GeminiService::new(gemini_api_key.clone()),
+        musicgen_service: MusicGenService::new(),
         auth_states: Arc::new(Mutex::new(HashMap::new())),
     };
 
+    let bind_addr = format!("{}:{}", host, port);
+
     HttpServer::new(move || {
         let cors = Cors::default()
-            .allowed_origin("http://127.0.0.1:8081")
+            .allowed_origin(&frontend_url)
             .allowed_origin("http://localhost:3000")
             .allowed_methods(vec!["GET", "POST"])
             .allowed_headers(vec![
@@ -68,7 +74,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::default())
             .configure(configure_app)
     })
-    .bind("127.0.0.1:8081")?
+    .bind(&bind_addr)?
     .run()
     .await
 }

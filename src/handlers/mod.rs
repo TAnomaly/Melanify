@@ -11,11 +11,8 @@ use rspotify::{
     scopes, AuthCodeSpotify, Credentials, OAuth,
 };
 use serde::{Deserialize, Serialize};
+use std::env;
 use uuid::Uuid;
-
-const SPOTIFY_CLIENT_ID: &str = "ae95afc24c12492a952e3d586ab8dcca";
-const SPOTIFY_CLIENT_SECRET: &str = "0c4fc4b5032b4b4fac846d69073d3d54";
-const SPOTIFY_REDIRECT_URI: &str = "http://127.0.0.1:8081/callback";
 
 const SUCCESS_HTML: &str = r#"<!DOCTYPE html>
 <html>
@@ -270,9 +267,13 @@ pub async fn spotify_callback(
                 request.tracks.len()
             );
 
-            let creds = Credentials::new(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET);
+            let spotify_client_id = env::var("SPOTIFY_CLIENT_ID").expect("SPOTIFY_CLIENT_ID must be set");
+            let spotify_client_secret = env::var("SPOTIFY_CLIENT_SECRET").expect("SPOTIFY_CLIENT_SECRET must be set");
+            let spotify_redirect_uri = env::var("SPOTIFY_REDIRECT_URI").expect("SPOTIFY_REDIRECT_URI must be set");
+
+            let creds = Credentials::new(&spotify_client_id, &spotify_client_secret);
             let oauth = OAuth {
-                redirect_uri: SPOTIFY_REDIRECT_URI.to_string(),
+                redirect_uri: spotify_redirect_uri.clone(),
                 scopes: scopes!(
                     "playlist-modify-public",
                     "playlist-modify-private",
@@ -869,9 +870,13 @@ pub async fn create_spotify_playlist_handler(
     session.insert("tracks_session_id", &session_id)?;
     println!("Stored session ID in cookie: {}", session_id);
 
-    let creds = Credentials::new(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET);
+    let spotify_client_id = env::var("SPOTIFY_CLIENT_ID").expect("SPOTIFY_CLIENT_ID must be set");
+    let spotify_client_secret = env::var("SPOTIFY_CLIENT_SECRET").expect("SPOTIFY_CLIENT_SECRET must be set");
+    let spotify_redirect_uri = env::var("SPOTIFY_REDIRECT_URI").expect("SPOTIFY_REDIRECT_URI must be set");
+
+    let creds = Credentials::new(&spotify_client_id, &spotify_client_secret);
     let oauth = OAuth {
-        redirect_uri: SPOTIFY_REDIRECT_URI.to_string(),
+        redirect_uri: spotify_redirect_uri.clone(),
         scopes: scopes!(
             "playlist-modify-public",
             "playlist-modify-private",
@@ -907,9 +912,13 @@ async fn create_spotify_playlist(
     playlist_name: String,
     playlist_description: Option<String>,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    let creds = Credentials::new(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET);
+    let spotify_client_id = env::var("SPOTIFY_CLIENT_ID").expect("SPOTIFY_CLIENT_ID must be set");
+    let spotify_client_secret = env::var("SPOTIFY_CLIENT_SECRET").expect("SPOTIFY_CLIENT_SECRET must be set");
+    let spotify_redirect_uri = env::var("SPOTIFY_REDIRECT_URI").expect("SPOTIFY_REDIRECT_URI must be set");
+
+    let creds = Credentials::new(&spotify_client_id, &spotify_client_secret);
     let oauth = OAuth {
-        redirect_uri: "http://127.0.0.1:8081/callback".to_string(),
+        redirect_uri: spotify_redirect_uri.clone(),
         scopes: scopes!(
             "playlist-modify-public",
             "playlist-modify-private",
@@ -982,4 +991,109 @@ async fn create_spotify_playlist(
         .map(String::as_str)
         .unwrap_or("")
         .to_string())
+}
+
+// ==================== AI MUSIC GENERATION HANDLERS ====================
+
+/// Health check endpoint for AI music service
+pub async fn ai_music_health_check(app_state: web::Data<AppState>) -> Result<HttpResponse, Error> {
+    match app_state.musicgen_service.health_check().await {
+        Ok(is_healthy) => {
+            if is_healthy {
+                Ok(HttpResponse::Ok().json(serde_json::json!({
+                    "status": "ok",
+                    "message": "AI Music service is running"
+                })))
+            } else {
+                Ok(HttpResponse::ServiceUnavailable().json(serde_json::json!({
+                    "status": "error",
+                    "message": "AI Music service is not healthy"
+                })))
+            }
+        }
+        Err(e) => Ok(HttpResponse::ServiceUnavailable().json(serde_json::json!({
+            "status": "error",
+            "message": format!("AI Music service is not available: {}", e)
+        }))),
+    }
+}
+
+/// Generate a single AI song from a text prompt
+pub async fn generate_ai_music(
+    app_state: web::Data<AppState>,
+    request: web::Json<AiMusicRequest>,
+) -> Result<HttpResponse, Error> {
+    println!("Received AI music generation request: {:?}", request);
+
+    // Validate prompt
+    if request.prompt.trim().is_empty() {
+        return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+            "success": false,
+            "error": "Prompt cannot be empty"
+        })));
+    }
+
+    // Generate the AI music
+    match app_state
+        .musicgen_service
+        .generate_song(&request.prompt, request.duration)
+        .await
+    {
+        Ok(response) => {
+            println!("Successfully generated AI music: {:?}", response);
+            Ok(HttpResponse::Ok().json(response))
+        }
+        Err(e) => {
+            eprintln!("Error generating AI music: {}", e);
+            Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                "success": false,
+                "error": format!("Failed to generate AI music: {}", e)
+            })))
+        }
+    }
+}
+
+/// Generate multiple AI songs from a list of prompts (batch generation)
+pub async fn generate_ai_music_batch(
+    app_state: web::Data<AppState>,
+    request: web::Json<AiMusicBatchRequest>,
+) -> Result<HttpResponse, Error> {
+    println!("Received AI music batch generation request with {} prompts", request.prompts.len());
+
+    // Validate request
+    if request.prompts.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+            "success": false,
+            "error": "Prompts list cannot be empty"
+        })));
+    }
+
+    // Check for empty prompts
+    for (idx, prompt_item) in request.prompts.iter().enumerate() {
+        if prompt_item.prompt.trim().is_empty() {
+            return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+                "success": false,
+                "error": format!("Prompt at index {} cannot be empty", idx)
+            })));
+        }
+    }
+
+    // Generate the AI music batch
+    match app_state
+        .musicgen_service
+        .generate_batch(request.into_inner())
+        .await
+    {
+        Ok(response) => {
+            println!("Successfully generated {} AI songs", response.songs.len());
+            Ok(HttpResponse::Ok().json(response))
+        }
+        Err(e) => {
+            eprintln!("Error generating AI music batch: {}", e);
+            Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                "success": false,
+                "error": format!("Failed to generate AI music batch: {}", e)
+            })))
+        }
+    }
 }
